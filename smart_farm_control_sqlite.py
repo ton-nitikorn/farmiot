@@ -4,6 +4,7 @@ import json
 import datetime
 from datetime import date
 import RPi.GPIO as GPIO
+import time
 
 def logger(message):
     print(str(datetime.datetime.now())+": "+message)
@@ -146,14 +147,17 @@ class Sensor:
         self.number = number
         self.sType = sType
         self.ip = ip
-        response = requests.get("http://"+ip+"/getData")
-        if response.status_code != 200:
-           print("Error:", response.status_code)
-        jsonData = response.json()
-        self.humidity = jsonData['data']['humidity']
-        self.temperature = jsonData['data']['temperature']
-        # self.humidity = "85"
-        # self.temperature = "32.1"
+        response = requests.get("http://"+ip+"/getData", timeout=10)
+        if response.status_code == 200:
+            jsonData = response.json()
+            self.humidity = jsonData['data']['humidity']
+            self.temperature = jsonData['data']['temperature']
+            # self.humidity = "85"
+            # self.temperature = "32.1"
+        else:
+            print("Error:", response.status_code)
+            self.humidity = "0.0"
+            self.temperature = "0.0"
         
     def __repr__(self):
         return "IP:"+self.ip
@@ -163,15 +167,8 @@ class Sensor:
         else:
             sensorType = "[Wind]"
         return "SENSOR "+sensorType+"#"+str(self.number)+" => IP:"+self.ip +"; T="+self.temperature+"; H="+self.humidity
-
-try:
-    #Database connection to SQLite3
-    connection = sqlite3.connect("farmiot.db")
-    connection.row_factory = dict_factory
-
-    #Setup GPIO output pins
-    setupGPIO()
-    
+        
+def loop():
     #Calculate age that how long since start_date (table: CONFIG_DATA) as of today.
     age = getCurrentAge()
 
@@ -230,6 +227,22 @@ try:
         stopHardware("FA02")
     else:
         print("Temp OK do not thing.")
+
+try:
+    #Database connection to SQLite3
+    connection = sqlite3.connect("farmiot.db")
+    connection.row_factory = dict_factory
+
+    #Setup GPIO output pins
+    setupGPIO()
+    
+    daylay = 30.0
+    
+    #Loop program
+    while 1:
+        loop()
+        print("Waiting for delay:"+str(daylay/60)+" minuite...")
+        time.sleep(daylay)
 
 except KeyboardInterrupt:
     pass

@@ -56,6 +56,14 @@ def dbGetTempControl(day):
     print(json_data)
     return json_data
 
+def getAllHardware():
+    cursor = connection.cursor()
+    cursor.execute("SELECT * FROM HARDWARE_CONTROL")
+    result = cursor.fetchone()
+    data = json.dumps(result)
+    json_data = json.loads(data)
+    return json_data
+
 def getHardware(hwCode):
     cursor = connection.cursor()
     cursor.execute("SELECT * FROM HARDWARE_CONTROL WHERE HW_CODE ='"+hwCode+"'")
@@ -127,12 +135,18 @@ def minuiteDiff(date_1, date_2):
     minutes = total_seconds/60
     return minutes
 
+def setupGPIO():
+    GPIO.setmode(GPIO.BCM)
+    hwList = getAllHardware()
+    for x in range(len(hwList)):
+        GPIO.setup(int(x["PIN_MAP"]), GPIO.OUT)
+
 class Sensor:
     def __init__(self, number, sType, ip):
         self.number = number
         self.sType = sType
         self.ip = ip
-        response = requests.get(""+ip+"/getData")
+        response = requests.get("http://"+ip+"/getData")
         if response.status_code != 200:
            print("Error:", response.status_code)
         jsonData = response.json()
@@ -154,6 +168,9 @@ try:
     #Database connection to SQLite3
     connection = sqlite3.connect("farmiot.db")
     connection.row_factory = dict_factory
+
+    #Setup GPIO output pins
+    setupGPIO()
     
     #Calculate age that how long since start_date (table: CONFIG_DATA) as of today.
     age = getCurrentAge()

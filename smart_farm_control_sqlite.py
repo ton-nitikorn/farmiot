@@ -59,7 +59,7 @@ def dbGetTempControl(day):
 def getAllHardware():
     cursor = connection.cursor()
     cursor.execute("SELECT * FROM HARDWARE_CONTROL")
-    result = cursor.fetchone()
+    result = cursor.fetchall()
     data = json.dumps(result)
     json_data = json.loads(data)
     return json_data
@@ -138,7 +138,7 @@ def minuiteDiff(date_1, date_2):
 def setupGPIO():
     GPIO.setmode(GPIO.BCM)
     hwList = getAllHardware()
-    for x in range(len(hwList)):
+    for x in hwList:
         GPIO.setup(int(x["PIN_MAP"]), GPIO.OUT)
 
 class Sensor:

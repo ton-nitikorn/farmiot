@@ -3,6 +3,7 @@ import requests
 import json
 import datetime
 from datetime import date
+#import RPi.GPIO as GPIO
 
 def logger(message):
     print(str(datetime.datetime.now())+": "+message)
@@ -54,6 +55,50 @@ def dbGetTempControl(day):
     logger("TEMP_CONTROL=")
     print(json_data)
     return json_data
+
+def getHardware(hwCode):
+    cursor = connection.cursor()
+    cursor.execute("SELECT * FROM HARDWARE_CONTROL WHERE HW_CODE ='"+hwCode+"'")
+    result = cursor.fetchone()
+    data = json.dumps(result)
+    json_data = json.loads(data)
+    logger("HARDWARE_CONTROL["+hwCode+"]=")
+    print(json_data)
+    return json_data
+
+def getSystemStatus(hwCode):
+    cursor = connection.cursor()
+    cursor.execute("SELECT * FROM FARM_SYSTEM_STATUS WHERE HW_CODE ='"+hwCode+"'")
+    result = cursor.fetchone()
+    data = json.dumps(result)
+    json_data = json.loads(data)
+    logger("STATUS["+hwCode+"]=")
+    print(json_data)
+    return json_data
+
+def insertSystemStatus(hwStatus):
+    sql = ''' INSERT INTO FARM_SYSTEM_STATUS(HW_CODE,STATUS,LAST_UPDATE)
+              VALUES(?,?,?) '''
+    cur = connection.cursor()
+    cur.execute(sql, hwStatus)
+    connection.commit()
+    return cur.lastrowid    
+
+def updateSystemStatus(hwStatus):
+    sql = ''' UPDATE FARM_SYSTEM_STATUS
+              SET STATUS = ?, LAST_UPDATE = ?
+              WHERE HW_CODE = ? '''
+    cur = connection.cursor()
+    cur.execute(sql, hwStatus)
+    connection.commit()
+    return cur.lastrowid    
+
+def deleteSystemStatus(hwCode):
+    sql = "DELETE FROM FARM_SYSTEM_STATUS WHERE HW_CODE = ?"
+    cur = connection.cursor()
+    cur.execute(sql, (hwCode,))
+    connection.commit()
+    return cur.lastrowid    
     
 def populateSensors(sensorsConfig):
     sensors = []
@@ -62,6 +107,19 @@ def populateSensors(sensorsConfig):
         sensors.insert(x, s)
         print(s)
     return sensors 
+
+def startHardware(hwCode):
+    print(hwCode+" START")
+    hwStatus = (hwCode, 1, datetime.datetime.now())
+    insertSystemStatus(hwStatus)
+    hw = getHardware(hwCode)
+    #GPIO.output(int(hw["PIN_MAP"]),GPIO.HIGH)
+
+def minuiteDiff(date_1, date_2):
+    time_delta = (date_2 - date_1)
+    total_seconds = time_delta.total_seconds()
+    minutes = total_seconds/60
+    return minutes
 
 class Sensor:
     def __init__(self, number, sType, ip):
@@ -75,7 +133,7 @@ class Sensor:
         #self.humidity = jsonData['data']['humidity']
         #self.temperature = jsonData['data']['temperature']
         self.humidity = "85"
-        self.temperature = "32.9"
+        self.temperature = "35.1"
         
     def __repr__(self):
         return "IP:"+self.ip
@@ -117,10 +175,38 @@ try:
     #Control hardware
     if float(avgTemp) > float(temlControl["MAX_TEMP"]):
         print("Temp too hot")
+        print("Try to turn ON FAN")
+
+        pumpStatus = getSystemStatus("PU01")
+
+        if str(getSystemStatus("FA01")) == "None":
+            startHardware("FA01")
+
+        elif str(getSystemStatus("FA02")) == "None":
+            startHardware("FA02")
+
+        elif str(pumpStatus) == "None":
+            startHardware("PU01")
+        
+        elif str(pumpStatus) != "None":
+            print("PU01 Last Active:"+pumpStatus["LAST_UPDATE"])
+            datetime_start = datetime.datetime.strptime(pumpStatus["LAST_UPDATE"], '%Y-%m-%d %H:%M:%S.%f')
+            minuite = minuiteDiff(datetime_start, datetime.datetime.now())
+            if(minuite > 20):
+                logger("PU01 RE-START")
+                hw = getHardware("PU01")
+                #GPIO.output(int(hw["PIN_MAP"]),GPIO.HIGH)
+                hwStatus = (1, datetime.datetime.now(), "PU01")
+                updateSystemStatus(hwStatus)
+        else:
+            print("Maximun open, do not thing.")
+
     elif float(avgTemp) < float(temlControl["MIN_TEMP"]):
         print("Temp too cool")
+        deleteSystemStatus("FA01")
+        deleteSystemStatus("FA02")
     else:
-        print("Temp OK")
+        print("Temp OK do not thing.")
 
 except KeyboardInterrupt:
     pass

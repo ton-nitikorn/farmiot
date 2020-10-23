@@ -3,7 +3,7 @@ import requests
 import json
 import datetime
 from datetime import date
-#import RPi.GPIO as GPIO
+import RPi.GPIO as GPIO
 
 def logger(message):
     print(str(datetime.datetime.now())+": "+message)
@@ -44,7 +44,7 @@ def dbGetSensor(sensorNoList, sType):
     json_data = json.loads(data)
     logger("SENSOR=")
     print(json_data)
-    return json_data;
+    return json_data
     
 def dbGetTempControl(day):
     cursor = connection.cursor()
@@ -113,7 +113,13 @@ def startHardware(hwCode):
     hwStatus = (hwCode, 1, datetime.datetime.now())
     insertSystemStatus(hwStatus)
     hw = getHardware(hwCode)
-    #GPIO.output(int(hw["PIN_MAP"]),GPIO.HIGH)
+    GPIO.output(int(hw["PIN_MAP"]),GPIO.HIGH)
+
+def stopHardware(hwCode):
+    print(hwCode+" STOP")
+    deleteSystemStatus(hwCode)
+    hw = getHardware(hwCode)
+    GPIO.output(int(hw["PIN_MAP"]),GPIO.LOW)
 
 def minuiteDiff(date_1, date_2):
     time_delta = (date_2 - date_1)
@@ -126,14 +132,14 @@ class Sensor:
         self.number = number
         self.sType = sType
         self.ip = ip
-        #response = requests.get(""+ip+"/"+uri)
-        #if response.status_code != 200:
-        #    print("Error:", response.status_code)
-        #jsonData = response.json()
-        #self.humidity = jsonData['data']['humidity']
-        #self.temperature = jsonData['data']['temperature']
-        self.humidity = "85"
-        self.temperature = "35.1"
+        response = requests.get(""+ip+"/"+uri)
+        if response.status_code != 200:
+           print("Error:", response.status_code)
+        jsonData = response.json()
+        self.humidity = jsonData['data']['humidity']
+        self.temperature = jsonData['data']['temperature']
+        # self.humidity = "85"
+        # self.temperature = "32.1"
         
     def __repr__(self):
         return "IP:"+self.ip
@@ -195,7 +201,7 @@ try:
             if(minuite > 20):
                 logger("PU01 RE-START")
                 hw = getHardware("PU01")
-                #GPIO.output(int(hw["PIN_MAP"]),GPIO.HIGH)
+                GPIO.output(int(hw["PIN_MAP"]),GPIO.HIGH)
                 hwStatus = (1, datetime.datetime.now(), "PU01")
                 updateSystemStatus(hwStatus)
         else:
@@ -203,8 +209,8 @@ try:
 
     elif float(avgTemp) < float(temlControl["MIN_TEMP"]):
         print("Temp too cool")
-        deleteSystemStatus("FA01")
-        deleteSystemStatus("FA02")
+        stopHardware("FA01")
+        stopHardware("FA02")
     else:
         print("Temp OK do not thing.")
 
@@ -216,8 +222,8 @@ except:
     raise
     
 finally:  
-    #print ("Cleanup GPIO")
-    #GPIO.cleanup() # this ensures a clean exit  
+    print ("Cleanup GPIO")
+    GPIO.cleanup() # this ensures a clean exit  
     logger ("Close Database Connection")
     connection.close()
 

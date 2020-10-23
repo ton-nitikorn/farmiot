@@ -132,7 +132,7 @@ class Sensor:
         self.number = number
         self.sType = sType
         self.ip = ip
-        response = requests.get(""+ip+"/"+uri)
+        response = requests.get(""+ip+"/getData")
         if response.status_code != 200:
            print("Error:", response.status_code)
         jsonData = response.json()

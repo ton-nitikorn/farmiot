@@ -55,7 +55,7 @@ def dbGetTempControl(day):
     print(json_data)
     return json_data
     
-def poppulateSensors(sensorsConfig):
+def populateSensors(sensorsConfig):
     sensors = []
     for x in range(len(sensorsConfig)):
         s = Sensor(sensorsConfig[x]["NUMBER"], sensorsConfig[x]["TYPE"], sensorsConfig[x]["IP"])
@@ -75,7 +75,7 @@ class Sensor:
         #self.humidity = jsonData['data']['humidity']
         #self.temperature = jsonData['data']['temperature']
         self.humidity = "85"
-        self.temperature = "35"
+        self.temperature = "32.9"
         
     def __repr__(self):
         return "IP:"+self.ip
@@ -84,17 +84,24 @@ class Sensor:
             sensorType = "[Temp, Humi]"
         else:
             sensorType = "[Wind]"
-        return "SENSOR "+sensorType+"#"+str(self.number)+" => IP:"+self.ip
+        return "SENSOR "+sensorType+"#"+str(self.number)+" => IP:"+self.ip +"; T="+self.temperature+"; H="+self.humidity
 
 try:
+    #Database connection to SQLite3
     connection = sqlite3.connect("farmiot.db")
     connection.row_factory = dict_factory
     
+    #Calculate age that how long since start_date (table: CONFIG_DATA) as of today.
     age = getCurrentAge()
+
+    #Get suitable variable of each day from database (table: TEMP_CONTROL)
     temlControl = dbGetTempControl(age)
+
+    #Get sensor configuration from data base (table:SENSOR)
     sensorsConfig = dbGetSensor(temlControl["SENSOR_LIST_TH"], "1")
 
-    sensors = poppulateSensors(sensorsConfig)
+    #Initiate list of sensor's object that specific for each day
+    sensors = populateSensors(sensorsConfig)
     numOfSensor = len(sensorsConfig)
     totTemp = 0
     totHumi = 0
@@ -106,6 +113,14 @@ try:
     avgHumi = totHumi/numOfSensor
     logger("Average Temperature="+str(avgTemp))
     logger("Average Humidity="+str(avgHumi))
+
+    #Control hardware
+    if float(avgTemp) > float(temlControl["MAX_TEMP"]):
+        print("Temp too hot")
+    elif float(avgTemp) < float(temlControl["MIN_TEMP"]):
+        print("Temp too cool")
+    else:
+        print("Temp OK")
 
 except KeyboardInterrupt:
     pass

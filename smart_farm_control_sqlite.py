@@ -3,7 +3,7 @@ import requests
 import json
 import datetime
 from datetime import date
-#import RPi.GPIO as GPIO
+import RPi.GPIO as GPIO
 import time
 
 def logger(message):

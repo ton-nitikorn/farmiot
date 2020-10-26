@@ -253,14 +253,9 @@ try:
 
     #Setup GPIO output pins
     setupGPIO()
-    
-    daylay = 10.0
-    
-    #Loop program
-    while True:
-        loop()
-        print("Waiting for delay:"+str(daylay/60)+" minuite...")
-        time.sleep(daylay)
+
+    #Loop Program
+    loop()
 
 except KeyboardInterrupt:
     pass

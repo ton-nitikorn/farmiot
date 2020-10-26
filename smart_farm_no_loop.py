@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 import sqlite3
 import requests
 import json
@@ -248,7 +250,7 @@ def loop():
 
 try:
     #Database connection to SQLite3
-    connection = sqlite3.connect("farmiot.db")
+    connection = sqlite3.connect("/home/pi/farmiot/farmiot.db")
     connection.row_factory = dict_factory
 
     #Setup GPIO output pins

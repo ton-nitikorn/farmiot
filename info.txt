@@ -1,0 +1,3 @@
+
+sudo crontab -e
+ * *   *   *   *    /usr/bin/python3 /home/pi/farmiot/smart_farm_no_loop.py >> /home/pi/log/log3.log 2>&1

@@ -157,8 +157,8 @@ class Sensor:
                 self.temperature = "0.0"
         except:
             print("No data response from sensor: "+ str(self.number))
-            self.humidity = "76.0"
-            self.temperature = "31.0"
+            self.humidity = "0.0"
+            self.temperature = "0.0"
         
     def __repr__(self):
         return "IP:"+self.ip

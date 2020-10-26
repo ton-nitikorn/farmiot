@@ -43,8 +43,7 @@ def dbGetSensor(sensorNoList, sType):
     result = cursor.fetchall()
     data = json.dumps(result)
     json_data = json.loads(data)
-    logger("SENSOR=")
-    print(json_data)
+    logger("SENSOR="+str(json_data))
     return json_data
     
 def dbGetTempControl(day):
@@ -53,8 +52,7 @@ def dbGetTempControl(day):
     result = cursor.fetchone()
     data = json.dumps(result)
     json_data = json.loads(data)
-    logger("TEMP_CONTROL=")
-    print(json_data)
+    logger("TEMP_CONTROL="+str(json_data))
     return json_data
 
 def getAllHardware():
@@ -71,8 +69,7 @@ def getHardware(hwCode):
     result = cursor.fetchone()
     data = json.dumps(result)
     json_data = json.loads(data)
-    logger("HARDWARE_CONTROL["+hwCode+"]=")
-    print(json_data)
+    logger("HARDWARE_CONTROL["+hwCode+"]="+str(json_data))
     return json_data
 
 def getSystemStatus(hwCode):
@@ -81,8 +78,7 @@ def getSystemStatus(hwCode):
     result = cursor.fetchone()
     data = json.dumps(result)
     json_data = json.loads(data)
-    logger("STATUS["+hwCode+"]=")
-    print(json_data)
+    logger("STATUS["+hwCode+"]="+str(json_data))
     return json_data
 
 def insertSystemStatus(hwStatus):
@@ -122,13 +118,13 @@ def startHardware(hwCode):
     hwStatus = (hwCode, 1, datetime.datetime.now())
     insertSystemStatus(hwStatus)
     hw = getHardware(hwCode)
-    # GPIO.output(int(hw["PIN_MAP"]),GPIO.HIGH)
+    GPIO.output(int(hw["PIN_MAP"]),GPIO.HIGH)
 
 def stopHardware(hwCode):
     print(hwCode+" STOP")
     deleteSystemStatus(hwCode)
     hw = getHardware(hwCode)
-    # GPIO.output(int(hw["PIN_MAP"]),GPIO.LOW)
+    GPIO.output(int(hw["PIN_MAP"]),GPIO.LOW)
 
 def minuiteDiff(date_1, date_2):
     time_delta = (date_2 - date_1)
@@ -137,10 +133,10 @@ def minuiteDiff(date_1, date_2):
     return minutes
 
 def setupGPIO():
-    # GPIO.setmode(GPIO.BCM)
+    GPIO.setmode(GPIO.BCM)
     hwList = getAllHardware()
-    # for x in hwList:
-    #     GPIO.setup(int(x["PIN_MAP"]), GPIO.OUT)
+    for x in hwList:
+        GPIO.setup(int(x["PIN_MAP"]), GPIO.OUT)
 
 class Sensor:
     def __init__(self, number, sType, ip):
@@ -149,7 +145,7 @@ class Sensor:
         self.ip = ip
         self.active = False
         try:
-            response = requests.get("http://"+ip+"/getData", timeout=5)
+            response = requests.get("http://"+ip+"/getData", timeout=1)
             if response.status_code == 200:
                 jsonData = response.json()
                 self.humidity = jsonData['data']['humidity']
@@ -161,8 +157,8 @@ class Sensor:
                 self.temperature = "0.0"
         except:
             print("No data response from sensor: "+ str(self.number))
-            self.humidity = "0.0"
-            self.temperature = "0.0"
+            self.humidity = "76.0"
+            self.temperature = "31.0"
         
     def __repr__(self):
         return "IP:"+self.ip
@@ -213,7 +209,10 @@ def loop():
         print("Temp too hot")
         print("Try to turn ON FAN")
 
-        maxFan = int(temlControl["MAX_TEMP"])
+        maxFan = int(temlControl["MAX_FAN"])
+        if float(avgHumi) > 75.0:
+            maxFan +=1
+
         pumpStatus = getSystemStatus("PU01")
 
         for fanNo in range(1, maxFan):
@@ -228,10 +227,11 @@ def loop():
             print("PU01 Last Active:"+pumpStatus["LAST_UPDATE"])
             datetime_start = datetime.datetime.strptime(pumpStatus["LAST_UPDATE"], '%Y-%m-%d %H:%M:%S.%f')
             minuite = minuiteDiff(datetime_start, datetime.datetime.now())
+            print("PU01 is woring for "+str(minuite)+ " minuite.")
             if(minuite > 20):
                 logger("PU01 RE-START")
                 hw = getHardware("PU01")
-                # GPIO.output(int(hw["PIN_MAP"]),GPIO.HIGH)
+                GPIO.output(int(hw["PIN_MAP"]),GPIO.HIGH)
                 hwStatus = (1, datetime.datetime.now(), "PU01")
                 updateSystemStatus(hwStatus)
         else:
@@ -239,8 +239,11 @@ def loop():
 
     elif float(avgTemp) < float(temlControl["MIN_TEMP"]):
         print("Temp too cool")
-        stopHardware("FA01")
-        stopHardware("FA02")
+        maxFan = int(temlControl["MAX_TEMP"])
+        for fanNo in range(1, maxFan):
+            if str(getSystemStatus("FA0"+str(fanNo))) != "None":
+                stopHardware("FA0"+str(fanNo))
+                break
     else:
         print("Temp OK do not thing.")
 
@@ -252,13 +255,13 @@ try:
     #Setup GPIO output pins
     setupGPIO()
     
-    # daylay = 30.0
+    daylay = 10.0
     
     #Loop program
-    # while 1:
-    loop()
-        # print("Waiting for delay:"+str(daylay/60)+" minuite...")
-        # time.sleep(daylay)
+    while True:
+        loop()
+        print("Waiting for delay:"+str(daylay/60)+" minuite...")
+        time.sleep(daylay)
 
 except KeyboardInterrupt:
     pass
@@ -269,7 +272,7 @@ except:
     
 finally:  
     print ("Cleanup GPIO")
-    # GPIO.cleanup() # this ensures a clean exit  
+    GPIO.cleanup() # this ensures a clean exit  
     logger ("Close Database Connection")
     connection.close()
 

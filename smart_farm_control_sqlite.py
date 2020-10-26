@@ -204,14 +204,14 @@ def loop():
         avgHumi = totHumi/numOfSensorTemp 
         logger("Average Humidity="+str(avgHumi))
 
+    maxFan = int(temlControl["MAX_FAN"])
+    if float(avgHumi) > 75.0:
+        maxFan +=1
+
     #Control hardware
     if float(avgTemp) > float(temlControl["MAX_TEMP"]):
         print("Temp too hot")
         print("Try to turn ON FAN")
-
-        maxFan = int(temlControl["MAX_FAN"])
-        if float(avgHumi) > 75.0:
-            maxFan +=1
 
         pumpStatus = getSystemStatus("PU01")
 
@@ -239,7 +239,6 @@ def loop():
 
     elif float(avgTemp) < float(temlControl["MIN_TEMP"]):
         print("Temp too cool")
-        maxFan = int(temlControl["MAX_TEMP"])
         for fanNo in range(1, maxFan):
             if str(getSystemStatus("FA0"+str(fanNo))) != "None":
                 stopHardware("FA0"+str(fanNo))

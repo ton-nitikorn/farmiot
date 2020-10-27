@@ -155,12 +155,12 @@ class Sensor:
                 self.active = True
             else:
                 print("Error:", response.status_code)
-                self.humidity = "0.0"
-                self.temperature = "0.0"
+                self.humidity = 0.0
+                self.temperature = 0.0
         except:
             print("No data response from sensor: "+ str(self.number))
-            self.humidity = "0.0"
-            self.temperature = "0.0"
+            self.humidity = 0.0
+            self.temperature = 0.0
         
     def __repr__(self):
         return "IP:"+self.ip
@@ -169,7 +169,7 @@ class Sensor:
             sensorType = "[Temp, Humi]"
         else:
             sensorType = "[Wind]"
-        return "SENSOR "+sensorType+"#"+str(self.number)+" => IP:"+self.ip +"; T="+self.temperature+"; H="+self.humidity+"; Active:"+str(self.active)
+        return "SENSOR "+sensorType+"#"+str(self.number)+" => IP:"+self.ip +"; T="+str(self.temperature)+"; H="+str(self.humidity)+"; Active:"+str(self.active)
         
 def loop():
     #Calculate age that how long since start_date (table: CONFIG_DATA) as of today.

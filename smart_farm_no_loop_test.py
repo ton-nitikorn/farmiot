@@ -279,9 +279,12 @@ try:
 
     #Setup GPIO output pins
     setupGPIO()
+    
+    hw = getHardware("FA01")
+    GPIO.output(int(hw["PIN_MAP"]),GPIO.HIGH)
 
     #Loop Program
-    loop()
+    #loop()
 
 except KeyboardInterrupt:
     pass

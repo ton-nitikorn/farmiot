@@ -108,25 +108,31 @@ def deleteSystemStatus(hwCode):
     return cur.lastrowid    
    
 def populateSensors(sensorsConfig):
-    sensors = []
+    sReturn = []
     for x in range(len(sensorsConfig)):
         s = Sensor(sensorsConfig[x]["NUMBER"], sensorsConfig[x]["TYPE"], sensorsConfig[x]["IP"])
-        sensors.append(s)
+        sReturn.append(s)
         print(s)
-    return sensors 
+    return sReturn 
 
 def startHardware(hwCode):
     print(hwCode+" START")
     hwStatus = (hwCode, 1, datetime.datetime.now())
     insertSystemStatus(hwStatus)
     hw = getHardware(hwCode)
-    GPIO.output(int(hw["PIN_MAP"]),GPIO.HIGH)
+    GPIO.output(int(hw["PIN_MAP"]),GPIO.LOW)
 
 def stopHardware(hwCode):
     print(hwCode+" STOP")
     deleteSystemStatus(hwCode)
     hw = getHardware(hwCode)
-    GPIO.output(int(hw["PIN_MAP"]),GPIO.LOW)
+    GPIO.output(int(hw["PIN_MAP"]),GPIO.HIGH)
+    
+def isAllFanStop(maxFan):
+    for fanNo in range(1, maxFan):
+        if str(getSystemStatus("FA0"+str(fanNo))) != "None":
+            return False
+    return True
 
 def minuiteDiff(date_1, date_2):
     time_delta = (date_2 - date_1)
@@ -139,6 +145,7 @@ def setupGPIO():
     hwList = getAllHardware()
     for x in hwList:
         GPIO.setup(int(x["PIN_MAP"]), GPIO.OUT)
+        GPIO.output(int(x["PIN_MAP"]),GPIO.HIGH)
 
 class Sensor:
     def __init__(self, number, sType, ip):
@@ -150,26 +157,32 @@ class Sensor:
             response = requests.get("http://"+ip+"/getData", timeout=10)
             if response.status_code == 200:
                 jsonData = response.json()
-                self.humidity = jsonData['data']['humidity']
-                self.temperature = jsonData['data']['temperature']
-                self.active = True
+                if self.sType == "1":
+                    self.humidity = jsonData['data']['humidity']
+                    self.temperature = jsonData['data']['temperature']
+                    self.active = True
+                elif self.sType == "2":
+                    self.wind = jsonData['data']['Wind']
+                    self.active = True
             else:
                 print("Error:", response.status_code)
                 self.humidity = 0.0
                 self.temperature = 0.0
+                self.wind = 0.0
         except:
             print("No data response from sensor: "+ str(self.number))
             self.humidity = 0.0
             self.temperature = 0.0
+            self.wind = 0.0
         
     def __repr__(self):
         return "IP:"+self.ip
     def __str__(self):
         if self.sType == "1":
             sensorType = "[Temp, Humi]"
+            return "SENSOR "+sensorType+"#"+str(self.number)+" => IP:"+self.ip +"; T="+str(self.temperature)+"; H="+str(self.humidity)+"; Active:"+str(self.active)
         else:
-            sensorType = "[Wind]"
-        return "SENSOR "+sensorType+"#"+str(self.number)+" => IP:"+self.ip +"; T="+str(self.temperature)+"; H="+str(self.humidity)+"; Active:"+str(self.active)
+            return "SENSOR "+sensorType+"#"+str(self.number)+" => IP:"+self.ip +"; W="+str(self.wind)+"; Active:"+str(self.active)
         
 def loop():
     #Calculate age that how long since start_date (table: CONFIG_DATA) as of today.
@@ -180,9 +193,11 @@ def loop():
 
     #Get sensor configuration from data base (table:SENSOR)
     sensorsConfig = dbGetSensor(temlControl["SENSOR_LIST_TH"], "1")
+    sensorsConfigW = dbGetSensor(temlControl["SENSOR_LIST_W"], "2")
 
     #Initiate list of sensor's object that specific for each day
     sensors = populateSensors(sensorsConfig)
+    populateSensors(sensorsConfigW)
     totTemp = 0
     numOfSensorTemp = 0
     totHumi = 0
@@ -212,10 +227,13 @@ def loop():
 
     #Control hardware
     if float(avgTemp) > float(temlControl["MAX_TEMP"]):
-        print("Temp too hot")
+        print("Temp too warm")
         print("Try to turn ON FAN")
 
         pumpStatus = getSystemStatus("PU01")
+        
+        hw = getHardware("HE01")
+        GPIO.output(int(hw["PIN_MAP"]),GPIO.HIGH)
 
         for fanNo in range(1, maxFan):
             if str(getSystemStatus("FA0"+str(fanNo))) == "None":
@@ -229,11 +247,11 @@ def loop():
             print("PU01 Last Active:"+pumpStatus["LAST_UPDATE"])
             datetime_start = datetime.datetime.strptime(pumpStatus["LAST_UPDATE"], '%Y-%m-%d %H:%M:%S.%f')
             minuite = minuiteDiff(datetime_start, datetime.datetime.now())
-            print("PU01 is woring for "+str(minuite)+ " minuite.")
+            print("PU01 is working for "+str(minuite)+ " minuite.")
             if(minuite > 20):
                 logger("PU01 RE-START")
                 hw = getHardware("PU01")
-                GPIO.output(int(hw["PIN_MAP"]),GPIO.HIGH)
+                GPIO.output(int(hw["PIN_MAP"]),GPIO.LOW)
                 hwStatus = (1, datetime.datetime.now(), "PU01")
                 updateSystemStatus(hwStatus)
         else:
@@ -245,6 +263,11 @@ def loop():
             if str(getSystemStatus("FA0"+str(fanNo))) != "None":
                 stopHardware("FA0"+str(fanNo))
                 break
+        if isAllFanStop(maxFan) and age <= int(dbGetConfigData("HEATER_WORK_UNTIL")):
+            hw = getHardware("HE01")
+            GPIO.output(int(hw["PIN_MAP"]),GPIO.LOW)
+            
+                
     else:
         print("Temp OK do not thing.")
 

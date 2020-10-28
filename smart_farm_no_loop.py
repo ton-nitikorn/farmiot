@@ -112,6 +112,7 @@ def populateSensors(sensorsConfig):
     for x in range(len(sensorsConfig)):
         s = Sensor(sensorsConfig[x]["NUMBER"], sensorsConfig[x]["TYPE"], sensorsConfig[x]["IP"])
         sReturn.append(s)
+        time.sleep(16.0)
         print(s)
     return sReturn 
 

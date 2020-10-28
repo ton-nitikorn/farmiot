@@ -112,6 +112,7 @@ def populateSensors(sensorsConfig):
     for x in range(len(sensorsConfig)):
         s = Sensor(sensorsConfig[x]["NUMBER"], sensorsConfig[x]["TYPE"], sensorsConfig[x]["IP"])
         sReturn.append(s)
+        time.sleep(2.0)
         print(s)
     return sReturn 
 
@@ -278,13 +279,29 @@ try:
     connection.row_factory = dict_factory
 
     #Setup GPIO output pins
-    setupGPIO()
+    #setupGPIO()
     
-    hw = getHardware("FA01")
-    GPIO.output(int(hw["PIN_MAP"]),GPIO.HIGH)
+    #hw = getHardware("FA01")
+    #GPIO.output(int(hw["PIN_MAP"]),GPIO.HIGH)
 
     #Loop Program
     #loop()
+
+    #s=Sensor("6", "1", "192.168.1.106")
+    #print(s)
+
+    age = getCurrentAge()
+
+    #Get suitable variable of each day from database (table: TEMP_CONTROL)
+    temlControl = dbGetTempControl(age)
+
+    #Get sensor configuration from data base (table:SENSOR)
+    sensorsConfig = dbGetSensor(temlControl["SENSOR_LIST_TH"], "1")
+    #sensorsConfigW = dbGetSensor(temlControl["SENSOR_LIST_W"], "2")
+
+    #Initiate list of sensor's object that specific for each day
+    sensors = populateSensors(sensorsConfig)
+
 
 except KeyboardInterrupt:
     pass

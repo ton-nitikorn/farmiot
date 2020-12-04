@@ -112,7 +112,7 @@ def populateSensors(sensorsConfig):
     for x in range(len(sensorsConfig)):
         s = Sensor(sensorsConfig[x]["NUMBER"], sensorsConfig[x]["TYPE"], sensorsConfig[x]["IP"])
         sReturn.append(s)
-        #time.sleep(1.0)
+        time.sleep(16.0)
         print(s)
     return sReturn 
 
@@ -155,7 +155,7 @@ class Sensor:
         self.ip = ip
         self.active = False
         try:
-            response = requests.get("http://"+ip+"/getData", timeout=1)
+            response = requests.get("http://"+ip+"/getData", timeout=5)
             if response.status_code == 200:
                 jsonData = response.json()
                 if self.sType == "1":
@@ -189,7 +189,6 @@ class Sensor:
 def loop():
     #Calculate age that how long since start_date (table: CONFIG_DATA) as of today.
     age = getCurrentAge()
-    age = "2"
 
     #Get suitable variable of each day from database (table: TEMP_CONTROL)
     temlControl = dbGetTempControl(age)
@@ -227,8 +226,6 @@ def loop():
     maxFan = int(temlControl["MAX_FAN"])
     if float(avgHumi) > 75.0:
         maxFan +=1
-
-    avgTemp = 37.0
 
     #Control hardware
     if float(avgTemp) > float(temlControl["MAX_TEMP"]):

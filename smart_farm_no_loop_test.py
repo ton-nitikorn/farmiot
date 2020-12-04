@@ -279,10 +279,11 @@ try:
     connection.row_factory = dict_factory
 
     #Setup GPIO output pins
-    #setupGPIO()
+    setupGPIO()
     
-    #hw = getHardware("FA01")
-    #GPIO.output(int(hw["PIN_MAP"]),GPIO.HIGH)
+    hw = getHardware("FA01")
+    #GPIO.output(int(hw["PIN_MAP"]),GPIO.LOW)
+    GPIO.output(27,GPIO.HIGH)
 
     #Loop Program
     #loop()
@@ -290,17 +291,17 @@ try:
     #s=Sensor("6", "1", "192.168.1.106")
     #print(s)
 
-    age = getCurrentAge()
+    #age = getCurrentAge()
 
     #Get suitable variable of each day from database (table: TEMP_CONTROL)
-    temlControl = dbGetTempControl(age)
+    #temlControl = dbGetTempControl(age)
 
     #Get sensor configuration from data base (table:SENSOR)
-    sensorsConfig = dbGetSensor(temlControl["SENSOR_LIST_TH"], "1")
+    #sensorsConfig = dbGetSensor(temlControl["SENSOR_LIST_TH"], "1")
     #sensorsConfigW = dbGetSensor(temlControl["SENSOR_LIST_W"], "2")
 
     #Initiate list of sensor's object that specific for each day
-    sensors = populateSensors(sensorsConfig)
+    #sensors = populateSensors(sensorsConfig)
 
 
 except KeyboardInterrupt:

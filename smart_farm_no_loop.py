@@ -112,7 +112,7 @@ def populateSensors(sensorsConfig):
     for x in range(len(sensorsConfig)):
         s = Sensor(sensorsConfig[x]["NUMBER"], sensorsConfig[x]["TYPE"], sensorsConfig[x]["IP"])
         sReturn.append(s)
-        time.sleep(16.0)
+        #time.sleep(1.0)
         print(s)
     return sReturn 
 
@@ -146,7 +146,7 @@ def setupGPIO():
     hwList = getAllHardware()
     for x in hwList:
         GPIO.setup(int(x["PIN_MAP"]), GPIO.OUT)
-        GPIO.output(int(x["PIN_MAP"]),GPIO.HIGH)
+        #GPIO.output(int(x["PIN_MAP"]),GPIO.HIGH)
 
 class Sensor:
     def __init__(self, number, sType, ip):
@@ -155,7 +155,7 @@ class Sensor:
         self.ip = ip
         self.active = False
         try:
-            response = requests.get("http://"+ip+"/getData", timeout=10)
+            response = requests.get("http://"+ip+"/getData", timeout=1)
             if response.status_code == 200:
                 jsonData = response.json()
                 if self.sType == "1":
@@ -189,6 +189,7 @@ class Sensor:
 def loop():
     #Calculate age that how long since start_date (table: CONFIG_DATA) as of today.
     age = getCurrentAge()
+    age = "2"
 
     #Get suitable variable of each day from database (table: TEMP_CONTROL)
     temlControl = dbGetTempControl(age)
@@ -227,47 +228,67 @@ def loop():
     if float(avgHumi) > 75.0:
         maxFan +=1
 
+    avgTemp = 37.0
+
     #Control hardware
     if float(avgTemp) > float(temlControl["MAX_TEMP"]):
         print("Temp too warm")
         print("Try to turn ON FAN")
 
         pumpStatus = getSystemStatus("PU01")
+
+        if str(getSystemStatus("HE01")) != "None":
+            stopHardware("HE01")
         
-        hw = getHardware("HE01")
-        GPIO.output(int(hw["PIN_MAP"]),GPIO.HIGH)
-
-        for fanNo in range(1, maxFan):
-            if str(getSystemStatus("FA0"+str(fanNo))) == "None":
-                startHardware("FA0"+str(fanNo))
-                break
-
-        if str(pumpStatus) == "None":
-                startHardware("PU01")
-            
-        elif str(pumpStatus) != "None":
-            print("PU01 Last Active:"+pumpStatus["LAST_UPDATE"])
-            datetime_start = datetime.datetime.strptime(pumpStatus["LAST_UPDATE"], '%Y-%m-%d %H:%M:%S.%f')
-            minuite = minuiteDiff(datetime_start, datetime.datetime.now())
-            print("PU01 is working for "+str(minuite)+ " minuite.")
-            if(minuite > 20):
-                logger("PU01 RE-START")
-                hw = getHardware("PU01")
-                GPIO.output(int(hw["PIN_MAP"]),GPIO.LOW)
-                hwStatus = (1, datetime.datetime.now(), "PU01")
-                updateSystemStatus(hwStatus)
         else:
-            print("Maximun open, do not thing.")
+            fanOpenCount = 0
+            fanStartFlag = False
+            for fanNo in range(1, maxFan):
+                fanOpenCount += 1
+                if str(getSystemStatus("FA0"+str(fanNo))) == "None":
+                    startHardware("FA0"+str(fanNo))
+                    fanStartFlag = True
+                    break
+                    
+            print("fanOpenCount="+ str(fanOpenCount))
+            print("maxFan="+ str(maxFan))
+            print("pumpStatus="+ str(pumpStatus))
+            if (fanOpenCount >= (maxFan-1)) and (str(pumpStatus) == "None") and fanStartFlag == False:
+                startHardware("PU01")
+                
+            elif str(pumpStatus) != "None":
+                print("PU01 Last Active:"+pumpStatus["LAST_UPDATE"])
+                datetime_start = datetime.datetime.strptime(pumpStatus["LAST_UPDATE"], '%Y-%m-%d %H:%M:%S.%f')
+                minuite = minuiteDiff(datetime_start, datetime.datetime.now())
+                print("PU01 is working for "+str(minuite)+ " minuite.")
+                if(minuite > 20):
+                    logger("PU01 RE-START")
+                    hw = getHardware("PU01")
+                    GPIO.output(int(hw["PIN_MAP"]),GPIO.LOW)
+                    hwStatus = (1, datetime.datetime.now(), "PU01")
+                    updateSystemStatus(hwStatus)
+                    print("PU01 STOP")
+                else:
+                    print("PU01 is still working...")
+            else:
+                print("Maximun open, do not thing.")
 
     elif float(avgTemp) < float(temlControl["MIN_TEMP"]):
         print("Temp too cool")
-        for fanNo in range(1, maxFan):
-            if str(getSystemStatus("FA0"+str(fanNo))) != "None":
-                stopHardware("FA0"+str(fanNo))
-                break
-        if isAllFanStop(maxFan) and int(age) <= int(dbGetConfigData("HEATER_WORK_UNTIL")):
-            hw = getHardware("HE01")
-            GPIO.output(int(hw["PIN_MAP"]),GPIO.LOW)
+        
+        if str(getSystemStatus("PU01")) != "None":
+            stopHardware("PU01")
+        
+        else:
+            fanStopFlag = False
+            for fanNo in range(1, maxFan):
+                if str(getSystemStatus("FA0"+str(fanNo))) != "None":
+                    stopHardware("FA0"+str(fanNo))
+                    fanStopFlag = True
+                    break
+        
+            if str(getSystemStatus("HE01")) == "None" and isAllFanStop(maxFan) and int(age) <= int(dbGetConfigData("HEATER_WORK_UNTIL")) and fanStopFlag == False:
+                startHardware("HE01")
             
                 
     else:
@@ -292,7 +313,7 @@ except:
     raise
     
 finally:  
-    print ("Cleanup GPIO")
+    #print ("Cleanup GPIO")
     #GPIO.cleanup() # this ensures a clean exit  
     logger ("Close Database Connection")
     connection.close()

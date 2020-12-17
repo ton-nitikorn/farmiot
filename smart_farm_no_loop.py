@@ -112,7 +112,7 @@ def populateSensors(sensorsConfig):
     for x in range(len(sensorsConfig)):
         s = Sensor(sensorsConfig[x]["NUMBER"], sensorsConfig[x]["TYPE"], sensorsConfig[x]["IP"])
         sReturn.append(s)
-        time.sleep(16.0)
+        #time.sleep(16.0)
         print(s)
     return sReturn 
 
@@ -185,7 +185,26 @@ class Sensor:
         else:
             sensorType = "[Wind]"
             return "SENSOR "+sensorType+"#"+str(self.number)+" => IP:"+self.ip +"; W="+str(self.wind)+"; Active:"+str(self.active)
+ 
+
+def sendThingspeak(temp, humi, wind, maxFan):
+    pump_status = 0
+    heater_status = 0
+    fan_status = 0
+    
+    if str(getSystemStatus("PU01")) != "None":
+        pump_status = 1
         
+    if str(getSystemStatus("HE01")) != "None":
+        heater_status = 1
+
+    for fanNo in range(1, maxFan):
+        if str(getSystemStatus("FA0"+str(fanNo))) != "None":
+            fan_status +=1       
+
+            
+    response = requests.get("http://api.thingspeak.com/update?api_key=KUHCDLCKFWB00U1O&field1="+str(temp)+"&field2="+str(humi)+"&field3="+str(wind)+"&field4="+str(pump_status)+"&field5="+str(heater_status)+"&field6="+str(fan_status), timeout=5)
+ 
 def loop():
     #Calculate age that how long since start_date (table: CONFIG_DATA) as of today.
     age = getCurrentAge()
@@ -199,13 +218,16 @@ def loop():
 
     #Initiate list of sensor's object that specific for each day
     sensors = populateSensors(sensorsConfig)
-    populateSensors(sensorsConfigW)
+    sonsors_w = populateSensors(sensorsConfigW)
     totTemp = 0
     numOfSensorTemp = 0
     totHumi = 0
     numOfSensorHumi = 0
+    totWind = 0
+    numOfSensorWind = 0
     avgTemp = 0
     avgHumi = 0
+    avgWind = 0
     for s in sensors:
         if float(s.temperature) > 0.0:
             totTemp += float(s.temperature)
@@ -222,6 +244,16 @@ def loop():
     if numOfSensorHumi > 0:
         avgHumi = totHumi/numOfSensorTemp 
         logger("Average Humidity="+str(avgHumi))
+        
+        
+    for sw in sonsors_w:
+        if float(sw.wind) > 0.0:
+            totWind += float(sw.wind)
+            numOfSensorWind += 1
+    
+    if numOfSensorWind > 0:
+        avgWind = totWind/numOfSensorWind 
+        logger("Average Wind="+str(avgWind))
 
     maxFan = int(temlControl["MAX_FAN"])
     if float(avgHumi) > 75.0:
@@ -290,6 +322,8 @@ def loop():
                 
     else:
         print("Temp OK do not thing.")
+
+    sendThingspeak(avgTemp, avgHumi, avgWind, maxFan)
 
 try:
     #Database connection to SQLite3
